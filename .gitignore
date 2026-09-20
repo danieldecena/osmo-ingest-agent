@@ -1,0 +1,11 @@
+# State and output, not source.
+.lock/
+.last_seen
+.last_failure
+.absent_ticks
+*.log
+launchd.err
+*.bak
+*.bak-*
+*.bak2-*
+fcp-prefs-backup-*.plist
