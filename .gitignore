@@ -9,3 +9,4 @@ launchd.err
 *.bak-*
 *.bak2-*
 fcp-prefs-backup-*.plist
+CLEAR_CAMERA_OK
