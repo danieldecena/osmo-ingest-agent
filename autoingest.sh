@@ -120,15 +120,34 @@ if [ ! -e "$AGENT/CLEAR_CAMERA_OK" ]; then
   exit 0
 fi
 
-# Clear, file by file, and only where the archive holds a byte-identical copy.
+# Clear, file by file, and only where the archive holds a byte-identical
+# copy -- compared by SHA-256, not by size.
+#
+# This used to compare `stat -f%z` while its own comment claimed
+# byte-identical. Size equality is not identity: two different files of the
+# same length pass it. The verify above does hash every clip it indexed,
+# but this loop deletes EVERY file under DCIM, including the ones footcat
+# does not index, and for those the size check was the only thing standing
+# between a bad copy and a deletion that cannot be undone.
+#
+# Hashing the card again costs a minute per card. Losing a take costs the
+# take.
 CLEARED=0; KEPT=0
 while IFS= read -r -d '' f; do
   rel="${f#$CARD/}"
   dst="$ARCHIVE/$rel"
-  if [ -f "$dst" ] && [ "$(stat -f%z "$f")" = "$(stat -f%z "$dst")" ]; then
+  if [ ! -f "$dst" ]; then
+    KEPT=$((KEPT+1)); say "kept on camera (no copy in the archive): $rel"
+    continue
+  fi
+  src_sum=$(shasum -a 256 "$f" 2>/dev/null | cut -d' ' -f1)
+  dst_sum=$(shasum -a 256 "$dst" 2>/dev/null | cut -d' ' -f1)
+  # An unreadable file gives an empty sum. Two empties must never compare
+  # equal and delete the original.
+  if [ -n "$src_sum" ] && [ "$src_sum" = "$dst_sum" ]; then
     rm -f "$f" && CLEARED=$((CLEARED+1))
   else
-    KEPT=$((KEPT+1)); say "kept on camera (no matching copy): $rel"
+    KEPT=$((KEPT+1)); say "kept on camera (copy does not match): $rel"
   fi
 done < <(find "$CARD/DCIM" -type f -print0)
 
